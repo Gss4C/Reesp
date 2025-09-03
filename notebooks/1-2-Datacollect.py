@@ -62,6 +62,33 @@ def _(pd):
 
 
 @app.cell
+def _(mo):
+    mo.md(
+        r"""
+    # Decisione delle variabili
+
+    - Id
+    - YearBuilt
+    - Heating
+    - GarageCars
+    - SalePrice
+    - Fireplaces
+    - LandSlope
+    - Street
+    - LotArea
+    - OverallCond
+    """
+    )
+    return
+
+
+@app.cell
+def _():
+    import altair as alt
+    return
+
+
+@app.cell
 def _():
     return
 
