@@ -57,7 +57,7 @@ def _(BertModel, tokenizer):
 @app.cell
 def _(modello):
     from torchsummary import summary
-    summary(modello)
+    summary(modello) #visualizzazione dell'architettura
     return
 
 
