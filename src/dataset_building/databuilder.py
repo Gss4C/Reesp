@@ -5,14 +5,18 @@ import pandas as pd
 features   = ["Id", "YearBuilt", "Heating", "GarageCars", "SalePrice", "Fireplaces", "LandSlope", "Street", "LotArea", "OverallCond"]
 ''' Features mapping
 id: id,
-YearBuilt: Anno di costruzione: year
-Fireplaces: Numero camini
-LotArea: Metri quadri
+--- Pezzi pre-montati --------------------
 OverallCond: Condizioni
-GarageCars: Bagni
-Heating: Sistema di riscaldamento
-Street: Ascensore S/N
-LandSlope: Centro, Periferia, Mare
+LandSlope:   Centro, Periferia, Mare
+--- Presi dal database -------------------
+GarageCars: stanze        - rooms_desc
+LotArea:    Metri quadri  - sqm
+SalePrice:  Prezzo vend.  - price_desc
+------------------------------------------
+YearBuilt:  Anno          - year
+Fireplaces: Numero camini - fireplaces
+Heating:    Riscaldamento - heating
+Street:     Ascensore S/N - elevator
 '''
 dataset_id ={
     "path": "./data/HP-ADVT/train.csv",
