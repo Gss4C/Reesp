@@ -69,12 +69,13 @@ class Descriptor:
                 return "quadrilocale con un bagno"
             case _:
                 return "casolare enorme con bagni"
-    def _condition_classes(self, condition):
-        if condition > 7:
+    def _condition_classes(self, data) -> str:
+        print("overall cond type is: ", type(data))
+        if data['OverallCond'] > 7:
             return 'Ottimo'
-        elif condition > 4:
+        elif data['OverallCond'] > 4:
             return 'Buono'
-        else
+        else:
             return 'Da ristrutturare'
     def _location_classes(self, location):
         if location == "Gtl":
@@ -89,13 +90,13 @@ class Descriptor:
         Funzione che raccoglie tutti i pezzi delle varie descrizioni e 
         li compone in maniera sensata dando in output una roba leggibile.
         Parameters:
-            house_data: dizionario contenente tutte le informazioni standard, proveniente da un to_dict() di una riga
+        house_data: dizionario contenente tutte le informazioni standard, proveniente da un to_dict() di una riga
         '''
         template = random.choice(self.templates)
 
         #seleziona altri pezzi dagli attributi
         intro          = random.choice(self.intros)
-        condition_desc = random.choice(self.conditions[self._condition_classes(house_data['OverallCond'])])
+        condition_desc = random.choice(self.conditions[self._condition_classes(house_data)])
         location_desc  = random.choice(self.location_descriptors[self._location_classes(house_data['LandSlope'])])
         features_desc  = self._generate_features_description(house_data)
         rooms_desc     = self._generate_rooms_description(house_data.get('GarageCars'))
