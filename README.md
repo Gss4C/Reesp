@@ -2,4 +2,4 @@
 
 Rees-P stands for Real-Estate Predictor. 
 
-This repo is a complex exercise to achieve new skills
+This repo is a portfolio complex project exercise to achieve new skills.
