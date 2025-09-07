@@ -1,4 +1,9 @@
 import random
+import pandas as pd
+import os
+import re
+from pathlib import Path
+
 
 class Descriptor:
     '''
@@ -45,7 +50,6 @@ class Descriptor:
             else:
                 features.append(f'con {data['Fireplaces']} camini')
         return ', '.join(features)
-
     def _generate_price_description(self, price) -> str: 
         ''' Genera descrizione del prezzo'''
         if price > 400000:
@@ -70,7 +74,7 @@ class Descriptor:
             case _:
                 return "casolare enorme con bagni"
     def _condition_classes(self, data) -> str:
-        print("overall cond type is: ", type(data))
+        
         if data['OverallCond'] > 7:
             return 'Ottimo'
         elif data['OverallCond'] > 4:
@@ -115,3 +119,67 @@ class Descriptor:
         )
 
         return description.strip()
+
+class DatasetMerger:
+    '''classe che fa un merge di datasets testuali ed immagini basandosi sull'id'''
+    def __init__(self, output_path: str, image_folder: str, dataframes):
+        self.output_path  = output_path
+        self.image_folder = Path(image_folder)
+        self.dataframes   = dataframes
+
+    def create_image_dict(self, id_pattern: str = r'(\d+)', ):
+        image_dict = {}
+
+        if not self.image_folder.exists():
+            print('Cartella non trovata. \nReturn dizionario vuoto')
+            return image_dict
+        for image_path in self.image_folder.iterdir():
+            match_id = re.search(id_pattern, image_path.stem)
+            if match_id:
+                image_id = match_id.group(1)
+                if image_id not in image_dict:
+                    image_dict[image_id] = []
+                image_dict[image_id].append(str(image_path))
+                
+        print(f"Trovati {len(image_dict)} ID unici con immagini")
+        total_images = sum(len(paths) for paths in image_dict.values())
+        print(f"Totale immagini: {total_images}")
+        
+        return image_dict
+    
+    def load_text_dataset(self) -> pd.DataFrame:
+        """Carica dataset"""
+        try:
+            if self.dataframes[0].endswith('.csv'):
+                df_house = pd.read_csv(self.dataframes[0])
+                df_desc  = pd.read_csv(self.dataframes[1])
+            elif self.dataframes[0].endswith(('.xlsx', '.xls')):
+                df_house = pd.read_excel(self.dataframes[0])
+                df_desc = pd.read_excel(self.dataframes[1])
+            else:
+                raise ValueError("Formato file non supportato. Usa CSV o Excel.")
+            
+            return df_house, df_desc
+            
+        except Exception as e:
+            print(f"Errore nel caricamento del dataset: {e}")
+            return None
+    def images_dataframer(self, image_dict):
+        pre_dataframe = []
+        for house_id, paths in image_dict.items():
+            for path in paths:
+                pre_dataframe.append({
+                    'Id': house_id,
+                    'image_path': path
+                })
+        return pd.DataFrame(pre_dataframe)
+
+    def dataset_merging(self):
+        dizionario_immagini = self.create_image_dict()
+        df_img = self.images_dataframer(dizionario_immagini)
+        df_house, df_desc = self.load_text_dataset()
+        
+        text_df = pd.DataFrame.merge(df_house, df_desc)
+        #TODO Da capire perché non fa il merge
+        total_df = pd.DataFrame.merge(text_df, df_img, on = 'Id', how = 'inner')
+        return text_df
