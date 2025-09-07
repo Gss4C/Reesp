@@ -1,8 +1,25 @@
 import random
+#import json
 import data_func as daf
 import generator as gen
 import pandas as pd
 
+def quality_check(description_df: pd.DataFrame):
+    '''Controllo delle descrizioni'''
+    print("📊 QUALITY METRICS:")
+    print(f"Total descriptions: {len(description_df)}")
+    #print(f"Avg word count: {description_df['word_count'].mean():.1f}")
+    #print(f"Word count range: {description_df['word_count'].min()}-{description_df['word_count'].max()}")
+    
+    # Check for duplicates
+    duplicates = description_df['description'].duplicated().sum()
+    print(f"Duplicate descriptions: {duplicates} ({duplicates/len(description_df)*100:.1f}%)")
+    
+    # Sample random descriptions
+    print("\n📝 RANDOM SAMPLES:")
+    samples = description_df.sample(5)
+    for idx, row in samples.iterrows():
+        print(f"\n{row['Id']}: {row['description']}")
 # Parameters #
 features   = ["Id", "YearBuilt", "Heating", "GarageCars", "SalePrice", "Fireplaces", "LandSlope", "Street", "LotArea", "OverallCond"]
 ''' Features mapping
@@ -32,32 +49,24 @@ if __name__ == '__main__':
 
     descriptions = []
     for idx, row in df.iterrows():
-        if idx < 200: #test
-            house_data = row.to_dict()
-            print(type(house_data))
-            description = desc_generator.description_assembly(house_data)
-            descriptions.append({
-                'property_id': idx+1,
-                'description': description,
-                'length': len(description.split())
-            })
+        #if idx < 200: #test
+        house_data = row.to_dict()
+        description = desc_generator.description_assembly(house_data)
+        descriptions.append({
+            'Id': idx+1,
+            'description': description,
+            'length': len(description.split())
+        })
 
         # Print progresso
-        if idx % 50 == 0:
+        if idx % 100 == 0:
             print(f'generated {idx} descriptions')
     
     description_df = pd.DataFrame(descriptions)
     description_df.to_csv('data/HP-ADVT/descriptions.csv', index = False)
+    quality_check(description_df)
 
-    # Quality check
-    print(f"\n=== GENERATION STATS ===")
-    print(f"Total descriptions: {len(descriptions)}")
-    print(f"Average length: {description_df['length'].mean():.1f} words")
-    print(f"Length range: {description_df['length'].min()}-{description_df['length'].max()} words")
-
-    #Samples
-    print(f"\n=== SAMPLE DESCRIPTIONS ===")
-    for i in range(3):
-        idx = random.randint(0, len(descriptions)-1)
-        print(f"\n{i+1}. {descriptions[idx]['description']}")
-        
+    test_obj = gen.DatasetMerger(output_path = 'test/schifino.csv', image_folder = 'data/images/house_data', dataframes = ['data/HP-ADVT/test.csv', 'data/HP-ADVT/descriptions.csv'])
+    df_test = test_obj.dataset_merging()
+    df_test.to_csv('data/schifino.csv')
+    #print(json.dumps(dict_test, indent = 4)) 
