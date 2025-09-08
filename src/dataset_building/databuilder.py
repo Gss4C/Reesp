@@ -56,7 +56,7 @@ if __name__ == '__main__':
         descriptions.append({
             'Id': idx+1,
             'description': description,
-            'length': len(description.split())
+            #'length': len(description.split())
         })
 
         # Print progresso

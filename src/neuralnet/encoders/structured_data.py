@@ -5,6 +5,11 @@ from sklearn.compose import ColumnTransformer
 import torch
 import torch.nn as nn
 
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+
 class DataPreprocessor:
     def __init__(self):
         self.preprocessor   = None
@@ -31,7 +36,7 @@ class DataPreprocessor:
         #creazione preprocessing pipeline
         self.preprocessor = ColumnTransformer([
             ('num', StandardScaler(), numeric_features),
-            ('cat', OneHotEncoder(drop='first'), categorical_features),
+            ('cat', OneHotEncoder(drop='first',sparse_output=False), categorical_features),
             ('bool', 'passthrough', boolean_features)
         ])
 
@@ -104,7 +109,9 @@ class StructuredEncoder(nn.Module):
             elif isinstance(module, nn.Embedding):
                 nn.init.normal_(module.weight, mean=0, std=0.1)
 
-    def forward(self, x, categorical_indices=None):
+    def forward(self, 
+                x, 
+                categorical_indices=None):
         """
         Forward pass
         
@@ -132,6 +139,113 @@ class StructuredEncoder(nn.Module):
         # Pass through MLP
         output = self.mlp(x)  # [batch_size, output_dim]
         return output
+
+class StructuredTrainer:
+    def __init__(self, 
+                 model, 
+                 lr=0.001, 
+                 weight_decay=1e-4):
+        self.model = model
+        self.optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.criterion = nn.MSELoss()
+        self.train_losses = []
+        self.val_losses = []
+    
+    def create_dataloader(self, 
+                          X, 
+                          y, 
+                          batch_size=32, 
+                          shuffle = True):
+        X_tensor = torch.FloatTensor(X)
+        y_tensor = torch.FloatTensor(y).unsqueeze(1)
+        dataset = TensorDataset(X_tensor, y_tensor)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+    def train_epoch(self, 
+                    train_loader):
+        '''One-Epoch Training. Definizione di come si deve svolgere l'epoca di addestramento'''
+        self.model.train() #funzione definita sotto
+        total_loss = 0
+        n_batches  = 0
+
+        for batch_x, batch_y in train_loader:
+            # Zero gradients
+            self.optimizer.zero_grad() #reset valori gradiente
+            
+            # Forward pass (senza embeddings per semplicità)
+            predictions = self.model(batch_x, categorical_indices=None)
+            
+            # Loss computation
+            loss = self.criterion(predictions, batch_y)
+            
+            # Backward pass
+            loss.backward()
+            
+            # Gradient clipping (per stabilità)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            
+            # Update weights
+            self.optimizer.step()
+            
+            total_loss += loss.item()
+            n_batches  += 1
+        
+        return total_loss / n_batches
+
+    def validate(self, 
+                 val_loader):
+        """Validation"""
+        self.model.eval()
+        total_loss = 0
+        n_batches  = 0
+        
+        with torch.no_grad():
+            for batch_x, batch_y in val_loader:
+                predictions = self.model(batch_x, categorical_indices=None)
+                loss = self.criterion(predictions, batch_y)
+                total_loss += loss.item()
+                n_batches += 1
+        return total_loss / n_batches
+
+    def train(self, 
+              X_train, 
+              y_train, 
+              X_val, 
+              y_val, 
+              epochs=50, 
+              batch_size=32):
+        #dataloaders creating
+        train_loader = self.create_dataloader(X_train, y_train, batch_size, shuffle=True)
+        val_loader   = self.create_dataloader(X_val, y_val, batch_size, shuffle=False)
+        print(f'=== STARTING TRAINING: {epochs} EPOCHS')
+        print(f"Train size: {len(X_train)}\n Val size: {len(X_val)}")
+        for epoch in range(epochs):
+            #train
+            train_loss = self.train_epoch(train_loader)
+            self.train_losses.append(train_loss)
+
+            #validate
+            val_loss = self.validate(val_loader)
+            self.val_losses.append(val_loss)
+
+            #Progress
+            if epoch % 10 == 0 or epoch == epochs - 1:
+                print(f"Epoch {epoch:3d}/{epochs}: Train Loss={train_loss:.4f}, Val Loss={val_loss:.4f}")
+        print('=== TRAINING COMPLETE ===')
+        return self.train_losses, self.val_losses
+    
+    def plot_training_curves(self, output_name):
+        """Plot training e validation loss"""
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.train_losses, label='Train Loss', alpha=0.7)
+        plt.plot(self.val_losses, label='Validation Loss', alpha=0.7)
+        plt.xlabel('Epoch')
+        plt.ylabel('MSE Loss')
+        plt.title('Structured Encoder Training Curves')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.savefig(f'./{output_name}.png')
+
 
 class Tester:
 
@@ -196,8 +310,114 @@ class Tester:
         print("✅ Gradient computation successful")
         
         return model
+    def test_full(self):
+        """Test completo: preprocessing + model + training"""
+    
+        # 1. Genera dataset fittizio più grande
+        np.random.seed(42)
+        n_samples = 1000
+        
+        synthetic_data = {
+            'sqm': np.random.randint(50, 200, n_samples),
+            'rooms': np.random.randint(1, 6, n_samples),
+            'location': np.random.choice(['Centro', 'Periferia', 'Mare'], n_samples),
+            'condition': np.random.choice(['Ottimo', 'Buono', 'Da_ristr'], n_samples),
+            'has_elevator': np.random.choice([True, False], n_samples),
+            'floor': np.random.randint(0, 10, n_samples),
+        }
+        
+        # Crea target correlato (formula semplificata)
+        price_base = synthetic_data['sqm'] * 2000  # Base price per sqm
+        location_bonus = np.where(synthetic_data['location'] == 'Centro', 50000, 0)
+        condition_bonus = np.where(synthetic_data['condition'] == 'Ottimo', 30000, 0)
+        noise = np.random.normal(0, 20000, n_samples)
+        
+        synthetic_data['SalePrice'] = price_base + location_bonus + condition_bonus + noise
+        
+        df = pd.DataFrame(synthetic_data)
+        print(f"Generated dataset: {df.shape}")
+        print(df.head())
+        
+        # 2. Preprocessing
+        preprocessor = DataPreprocessor()
+        X, y = preprocessor.fit_transform_preprocessor(df)
+        
+        # 3. Train/val split
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # 4. Crea e allena modello
+        model = StructuredEncoder(
+            input_dim=X.shape[1],
+            embedding_configs={},  # No embeddings per semplicità
+            hidden_dims=[256, 128],
+            output_dim=256
+        )
+        
+        trainer = StructuredTrainer(model, lr=0.001)
+        train_losses, val_losses = trainer.train(X_train, y_train, X_val, y_val, epochs=50)
+        
+        # 5. Plot risultati
+        trainer.plot_training_curves()
+        
+        # 6. Test finale
+        model.eval()
+        with torch.no_grad():
+            sample_input = torch.FloatTensor(X_val[:5])
+            predictions = model(sample_input)
+            print(f"\nSample predictions shape: {predictions.shape}")
+            print(f"Expected: (5, 256)")
+        
+        return model, trainer
+
 
 # Esegui test
-tester = Tester()
-X_test, y_test = tester.test_preprocessing()
-model = tester.test_structured_encoder()
+#tester = Tester()
+#X_test, y_test = tester.test_preprocessing()
+#model = tester.test_structured_encoder()
+#print(model)
+#trained_model, trainer = tester.test_full()
+
+def create_embedding_config(df: pd.DataFrame):
+    """Crea configurazione embeddings da dataset"""
+    embedding_configs = {}
+    
+    categorical_columns = df.select_dtypes(include=['object', 'category']).columns
+    
+    for col in categorical_columns:
+        unique_values = df[col].nunique()
+        embedding_configs[col] = {
+            'vocab_size': unique_values + 1,  # +1 per unknown values
+            'embed_dim': min(50, (unique_values + 1) // 2)
+        }
+    
+    return embedding_configs
+
+if __name__=='__main__':
+    dataset = 'data/output-datasets/train_img-desc-data.csv'
+    print("Hi\nI am the structured data encoder, and I am going to encode your dataset")
+    
+    df = pd.read_csv(dataset)
+    
+    preprocessor = DataPreprocessor()
+
+    X,y = preprocessor.fit_transform_preprocessor(df)
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    embedding_configs = create_embedding_config(df)
+    model = StructuredEncoder(
+            input_dim=X.shape[1],
+            embedding_configs=embedding_configs, 
+            hidden_dims=[256, 128],
+            output_dim=256
+        )
+    trainer = StructuredTrainer(model, lr=0.001)
+    train_losses, val_losses = trainer.train(X_train, y_train, X_val, y_val, epochs=50)
+
+    trainer.plot_training_curves('full_dataset')
+
+    model.eval()
+    with torch.no_grad():
+        sample_input = torch.FloatTensor(X_val[:5])
+        predictions = model(sample_input)
+        print(f"\nSample predictions shape: {predictions.shape}")
+        print(f"Expected: (5, 256)")
