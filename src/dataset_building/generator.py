@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import re
 from pathlib import Path
-
+import data_func as dfx
 
 class Descriptor:
     '''
@@ -122,10 +122,12 @@ class Descriptor:
 
 class DatasetMerger:
     '''classe che fa un merge di datasets testuali ed immagini basandosi sull'id'''
-    def __init__(self, output_path: str, image_folder: str, dataframes):
+    def __init__(self, output_path: str, image_folder: str, dataframes, features: list, test: bool=False):
         self.output_path  = output_path
         self.image_folder = Path(image_folder)
         self.dataframes   = dataframes
+        self.features     = features
+        self.test         = test
 
     def create_image_dict(self, id_pattern: str = r'(\d+)', ):
         image_dict = {}
@@ -147,12 +149,16 @@ class DatasetMerger:
         
         return image_dict
     
-    def load_text_dataset(self) -> pd.DataFrame:
+    def load_text_dataset(self, features):
         """Carica dataset"""
         try:
             if self.dataframes[0].endswith('.csv'):
-                df_house = pd.read_csv(self.dataframes[0])
+                
+                df_house = dfx.read_clean_dataset(self.dataframes[0], features)
+                
+                #df_house  = pd.read_csv(self.dataframes[0])
                 df_desc  = pd.read_csv(self.dataframes[1])
+
             elif self.dataframes[0].endswith(('.xlsx', '.xls')):
                 df_house = pd.read_excel(self.dataframes[0])
                 df_desc = pd.read_excel(self.dataframes[1])
@@ -169,7 +175,7 @@ class DatasetMerger:
         for house_id, paths in image_dict.items():
             for path in paths:
                 pre_dataframe.append({
-                    'Id': house_id,
+                    'Id': int(house_id),
                     'image_path': path
                 })
         return pd.DataFrame(pre_dataframe)
@@ -177,9 +183,16 @@ class DatasetMerger:
     def dataset_merging(self):
         dizionario_immagini = self.create_image_dict()
         df_img = self.images_dataframer(dizionario_immagini)
-        df_house, df_desc = self.load_text_dataset()
+        df_house, df_desc = self.load_text_dataset(self.features)
+        text_df = pd.DataFrame.merge(df_house, df_desc, on='Id', how='inner')
+
+        if self.test:
+            print('\n\n DATASET HOUSING')
+            print(df_house)
+            print('\n\n DATASET DESCRIZIONI')
+            print(df_desc)
+            print('\n\n DATASET Merged')
+            print(text_df)
         
-        text_df = pd.DataFrame.merge(df_house, df_desc)
-        #TODO Da capire perché non fa il merge
         total_df = pd.DataFrame.merge(text_df, df_img, on = 'Id', how = 'inner')
-        return text_df
+        return total_df
