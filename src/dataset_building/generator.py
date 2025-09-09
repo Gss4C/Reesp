@@ -122,8 +122,11 @@ class Descriptor:
 
 class DatasetMerger:
     '''classe che fa un merge di datasets testuali ed immagini basandosi sull'id'''
-    def __init__(self, output_path: str, image_folder: str, dataframes, features: list, test: bool=False):
-        self.output_path  = output_path
+    def __init__(self, 
+                 image_folder: str, 
+                 dataframes, 
+                 features: list, 
+                 test: bool=False):
         self.image_folder = Path(image_folder)
         self.dataframes   = dataframes
         self.features     = features
@@ -195,4 +198,5 @@ class DatasetMerger:
             print(text_df)
         
         total_df = pd.DataFrame.merge(text_df, df_img, on = 'Id', how = 'inner')
-        return total_df
+        df_list = [total_df, df_house, df_desc, df_img]
+        return df_list

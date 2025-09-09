@@ -41,7 +41,8 @@ dataset_id ={
     "path": "./data/HP-ADVT/train.csv",
     "img_path": "./data/images/house_data/"
 }
-output_path='data/output-datasets/train_img-desc-data.csv'
+#output_paths='data/output-datasets/train_img-desc-data.csv'
+output_paths = ['data/output-datasets/total_df.csv', 'data/output-datasets/house_df.csv', 'data/output-datasets/desc_df.csv', 'data/output-datasets/img_df.csv']
 
 if __name__ == '__main__':
     print("Hi, I'm the data-builder\nI will manipulate a standard dataset and an appropriate labelled image folder\nI will create the database for the dashboard")
@@ -67,11 +68,14 @@ if __name__ == '__main__':
     description_df.to_csv('data/HP-ADVT/descriptions.csv', index = False)
     quality_check(description_df)
 
-    test_obj = gen.DatasetMerger(output_path  = 'test/schifino.csv', 
-                                 image_folder = 'data/images/house_data', 
+    test_obj = gen.DatasetMerger(image_folder = 'data/images/house_data', 
                                  dataframes   = ['data/HP-ADVT/train.csv', 'data/HP-ADVT/descriptions.csv'],
                                  features     = features)
-    df_test = test_obj.dataset_merging()
+    df_list = test_obj.dataset_merging()
     
-    df_test.to_csv(output_path)
-    print('Salvato il dataset in: ', output_path)
+    for single_df, output_path in zip(df_list, output_paths):
+        single_df.to_csv(output_path)
+        print('Salvato il dataset in: ', output_path)    
+
+    #df_test.to_csv(output_path)
+    #print('Salvato il dataset in: ', output_path)
